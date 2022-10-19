@@ -1,6 +1,8 @@
+require("dotenv").config()
 const express = require("express")
 const multer = require("multer")
 const uuid = require("uuid").v4
+const { s3Uploadv3 } = require("./s3Service");
 const app = express()
 
 //this is for single file upload
@@ -27,15 +29,20 @@ const app = express()
 // })
 
 //this is a route to save the picture with the correct name using the uuid library
-const storage = multer.diskStorage({
-    destination: (req, file, cb)=>{
-        cb(null, "uploads")
-    },
-    filename: (req, file, cb)=>{
-        const {originalname} = file;
-        cb(null,`${uuid()}-${originalname}`);
-    }
-})
+// const storage = multer.diskStorage({
+//     destination: (req, file, cb)=>{
+//         cb(null, "uploads")
+//     },
+//     filename: (req, file, cb)=>{
+//         const {originalname} = file;
+//         cb(null,`${uuid()}-${originalname}`);
+//     }
+// })
+
+//this is for s3
+const storage = multer.memoryStorage();
+
+
 // this function is to selec whay type of file you want it, pdf, jpeg, video, etc.
 const fileFilter = (req, file, cb)=>{
     //this one is just for any type of image
@@ -51,9 +58,16 @@ const fileFilter = (req, file, cb)=>{
     }
 }
 
-const upload = multer({storage, fileFilter, limits: {fileSize: 1000000, files: 1}})
-app.post("/upload", upload.array("file"),(req, res)=>{
-    res.json({status: "success"});
+const upload = multer({storage, fileFilter, limits: {fileSize: 1000000000, files: 1}})
+app.post("/upload", upload.array("file"), async(req, res)=>{
+    try{
+        const results = await s3Uploadv3(req.files);
+        console.log(results);
+        res.json({status: "success"});
+    }
+    catch (err) {
+        console.log(err);
+      }
 })
 
 app.use((error, req, res, next)=>{
